@@ -1,0 +1,1 @@
+cmd_/home/arun/Desktop/avl/avl.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /home/arun/Desktop/avl/avl.ko /home/arun/Desktop/avl/avl.o /home/arun/Desktop/avl/avl.mod.o ;  true
