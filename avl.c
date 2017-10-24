@@ -25,8 +25,9 @@ struct Node{
 }*root=NULL;
 
 static struct timer_list my_timer;
+char buf[512];
 
-#define BLINK_DELAY 10*HZ
+#define BLINK_DELAY 1*HZ
 
 int height(struct Node *N){
 	if (N == NULL)
@@ -75,6 +76,15 @@ int getBalance(struct Node *N){
 	return height(N->left) - height(N->right);
 }
 
+struct Node* minValueNode(struct Node* node){
+	struct Node* curr = node;
+
+	while (curr->left != NULL)
+		curr = curr->left;
+
+	return curr;
+}
+
 struct Node* insert(struct Node* node, int key){
 	int balance;
 
@@ -112,6 +122,64 @@ struct Node* insert(struct Node* node, int key){
 	return node;
 }
 
+struct Node* deleteNode(struct Node* root, int key){
+	int balance;
+
+	printk(KERN_INFO "Deleting...");
+
+	if (root == NULL)
+		return root;
+
+	if ( key < root->key )
+		root->left = deleteNode(root->left, key);
+
+	else if( key > root->key )
+		root->right = deleteNode(root->right, key);
+
+	else{
+		if( (root->left == NULL) || (root->right == NULL) ){
+			struct Node *temp = root->left ? root->left : root->right;
+
+			if (temp == NULL){
+				temp = root;
+				root = NULL;
+			}
+			else
+				*root = *temp;
+			kfree(temp);
+		}
+		else{
+			struct Node* temp = minValueNode(root->right);
+			root->key = temp->key;
+			root->right = deleteNode(root->right, temp->key);
+		}
+	}
+
+	if (root == NULL)
+		return root;
+
+	root->height = 1 + max(height(root->left), height(root->right));
+	balance = getBalance(root);
+
+	if (balance > 1 && getBalance(root->left) >= 0)
+		return rightRotate(root);
+
+	if (balance > 1 && getBalance(root->left) < 0){
+		root->left =  leftRotate(root->left);
+		return rightRotate(root);
+	}
+
+	if (balance < -1 && getBalance(root->right) <= 0)
+		return leftRotate(root);
+
+	if (balance < -1 && getBalance(root->right) > 0){
+		root->right = rightRotate(root->right);
+		return leftRotate(root);
+	}
+
+	return root;
+}
+
 void preOrder(struct Node *root){
 	if(root != NULL){
 		printk(KERN_INFO "%d ", root->key);
@@ -128,24 +196,8 @@ void inOrder(struct Node *root){
 	}
 }
 
-static void my_timer_func(unsigned long data){
-	root=insert(root, 1);
-	inOrder(root);
-	my_timer.expires=jiffies+BLINK_DELAY;
-	add_timer(&my_timer);
-}
-
-static int __init init(void){
-	struct file *f;
-	char buf[512];
+void list_files(void){
 	char *argv[4],*envp[4];
-	mm_segment_t fs;
-	int i,ret;
-
-	for(i=0;i<512;i++)
-		buf[i]=0;
-
-	printk(KERN_INFO "Loaded module...\n");
 
 	argv[0]="/bin/bash";
 	argv[1]="-c";
@@ -158,6 +210,42 @@ static int __init init(void){
 	envp[3]=NULL;
 
 	call_usermodehelper(argv[0], argv, envp, UMH_WAIT_EXEC);
+}
+
+void read_file(void){
+	struct file *f;
+	mm_segment_t fs;
+	int i,ret;
+
+	for(i=0;i<512;i++)
+		buf[i]=0;
+
+	fs=get_fs();
+	set_fs(get_ds());
+	f=filp_open("/home/arun/Desktop/avl/file.txt", O_RDONLY, 0);
+	if(f==NULL)
+		printk(KERN_ALERT "filp_open error!!!");
+	else{
+		ret=vfs_read(f, buf, 512, &f->f_pos);
+		filp_close(f,NULL);
+	}
+	set_fs(fs);
+}
+
+static void my_timer_func(unsigned long data){
+	my_timer.expires=jiffies+BLINK_DELAY;
+	add_timer(&my_timer);
+}
+
+static int __init init(void){
+	struct file *f;
+	mm_segment_t fs;
+	int i,ret;
+
+	for(i=0;i<512;i++)
+		buf[i]=0;
+
+	printk(KERN_INFO "Loading module...\n");
 
 	fs=get_fs();
 	set_fs(get_ds());
@@ -177,6 +265,8 @@ static int __init init(void){
 		filp_close(f,NULL);
 	}
 	set_fs(fs);
+
+	list_files();
 
 	return 0;
 }
