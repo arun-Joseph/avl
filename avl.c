@@ -22,10 +22,11 @@ struct Node{
 	int key;
 	struct Node *left, *right;
 	int height;
-}*root=NULL;
+}*root=NULL, *ptr=NULL;
 
 static struct timer_list my_timer;
 char buf[512];
+int counter, tim, curr;
 
 #define BLINK_DELAY 1*HZ
 
@@ -79,6 +80,9 @@ int getBalance(struct Node *N){
 struct Node* minValueNode(struct Node* node){
 	struct Node* curr = node;
 
+	if (node == NULL)
+		return NULL;
+
 	while (curr->left != NULL)
 		curr = curr->left;
 
@@ -87,8 +91,6 @@ struct Node* minValueNode(struct Node* node){
 
 struct Node* insert(struct Node* node, int key){
 	int balance;
-
-	printk(KERN_INFO "Inserting...");
 
 	if (node == NULL)
         	return(newNode(key));
@@ -124,8 +126,6 @@ struct Node* insert(struct Node* node, int key){
 
 struct Node* deleteNode(struct Node* root, int key){
 	int balance;
-
-	printk(KERN_INFO "Deleting...");
 
 	if (root == NULL)
 		return root;
@@ -180,6 +180,72 @@ struct Node* deleteNode(struct Node* root, int key){
 	return root;
 }
 
+struct Node* search(struct Node* root, int key){
+	if (root == NULL)
+		return root;
+
+	if ( key < root->key )
+		root->left = search(root->left, key);
+
+	else if( key > root->key )
+		root->right = search(root->right, key);
+
+	return root;
+}
+
+struct Node* prev(struct Node* root, struct Node* pre, int key){
+	struct Node* tmp;
+
+	if (root == NULL)
+		return NULL;
+
+	if (root->key == key){
+		if (root->left != NULL){
+			tmp = root->left;
+
+			while (tmp->right)
+				tmp = tmp->right;
+			return tmp;
+		}
+		else
+			return pre;
+	}
+
+	if (root->key > key)
+		return prev(root->left, root, key);
+	else
+		return prev(root->right, pre, key);
+
+	return NULL;
+}
+
+struct Node* next(struct Node* root, struct Node* suc, int key){
+	struct Node* tmp;
+
+	if (root == NULL)
+		return NULL;
+
+	if (root->key == key){
+		if (root->right != NULL){
+			tmp = root->right;
+
+			while (tmp->left)
+				tmp = tmp->left;
+			return tmp;
+		}
+		else
+			return suc;
+	}
+
+	if (root->key < key)
+		return next(root->right, suc, key);
+	else
+		return next(root->left, root, key);
+
+	return NULL;
+}
+
+
 void preOrder(struct Node *root){
 	if(root != NULL){
 		printk(KERN_INFO "%d ", root->key);
@@ -212,27 +278,63 @@ void list_files(void){
 	call_usermodehelper(argv[0], argv, envp, UMH_WAIT_EXEC);
 }
 
-void read_file(void){
-	struct file *f;
-	mm_segment_t fs;
-	int i,ret;
-
-	for(i=0;i<512;i++)
-		buf[i]=0;
-
-	fs=get_fs();
-	set_fs(get_ds());
-	f=filp_open("/home/arun/Desktop/avl/file.txt", O_RDONLY, 0);
-	if(f==NULL)
-		printk(KERN_ALERT "filp_open error!!!");
-	else{
-		ret=vfs_read(f, buf, 512, &f->f_pos);
-		filp_close(f,NULL);
-	}
-	set_fs(fs);
-}
-
 static void my_timer_func(unsigned long data){
+	int num=0;
+
+	while(tim == data){
+		counter+=1;
+		if(buf[counter] == 'i'){
+			counter+=2;
+			num=0;
+			while(buf[counter] != '\n' && buf[counter] != '\0'){
+				num=num*10 + (int)buf[counter] - 48;
+				counter+=1;
+			}
+			root=insert(root, num);
+		}
+		else if(buf[counter] == 'r'){
+			counter+=2;
+			while(buf[counter] != '\n' && buf[counter] != '\0'){
+				num=num*10 + (int)buf[counter] - 48;
+				counter+=1;
+			}
+			root=deleteNode(root, num);
+		}
+		else if(buf[counter] == 'p'){
+			printk(KERN_INFO "PreOrder : ");
+			preOrder(root);
+			printk(KERN_INFO "Inorder : ");
+			inOrder(root);
+		}
+
+		if(buf[counter] != '\0'){
+			counter+=1;
+			tim=0;
+			while(buf[counter] != ' '){
+				tim=tim*10 + (int)buf[counter] - 48;
+				counter+=1;
+			}
+		}
+		else
+			tim=0;
+	}
+
+	printk(KERN_INFO "Time : %ld ; ", data);
+	ptr=next(root, NULL, curr);
+
+	if (root == NULL && ptr == NULL)
+		curr=-1;
+	else if (ptr == NULL){
+		ptr=minValueNode(root);
+		curr=ptr->key;
+		printk(KERN_INFO "Current process1 : %d", curr);
+	}
+	else{
+		curr=ptr->key;
+		printk(KERN_INFO "Current process2: %d", curr);
+	}
+
+	my_timer.data=data+1;
 	my_timer.expires=jiffies+BLINK_DELAY;
 	add_timer(&my_timer);
 }
@@ -240,12 +342,14 @@ static void my_timer_func(unsigned long data){
 static int __init init(void){
 	struct file *f;
 	mm_segment_t fs;
-	int i,ret;
+	int i,ret,num;
 
 	for(i=0;i<512;i++)
 		buf[i]=0;
 
 	printk(KERN_INFO "Loading module...\n");
+
+	list_files();
 
 	fs=get_fs();
 	set_fs(get_ds());
@@ -253,20 +357,58 @@ static int __init init(void){
 	if(f==NULL)
 		printk(KERN_ALERT "filp_open error!!!");
 	else{
-		printk(KERN_INFO "File opened");
 		ret=vfs_read(f, buf, 512, &f->f_pos);
-
-		init_timer(&my_timer);
-		my_timer.function=my_timer_func;
-		my_timer.data=0;
-		my_timer.expires=jiffies+BLINK_DELAY;
-		add_timer(&my_timer);
-
 		filp_close(f,NULL);
 	}
 	set_fs(fs);
 
-	list_files();
+	i=0;
+	num=0;
+	while(buf[i] != '\0'){
+		if(buf[i] == '\n'){
+			root=insert(root, num);
+			num=0;
+		}
+		else{
+			num=num*10 + (int)buf[i] - 48;
+		}
+		i++;
+	}
+
+	if(i!=0)
+		root=insert(root, num);
+
+	fs=get_fs();
+	set_fs(get_ds());
+	f=filp_open("/home/arun/Desktop/avl/input.txt", O_RDONLY, 0);
+	if(f==NULL)
+		printk(KERN_ALERT "filp_open error!!!");
+	else{
+		ret=vfs_read(f, buf, 512, &f->f_pos);
+		filp_close(f,NULL);
+	}
+	set_fs(fs);
+
+	tim=0;
+	counter=0;
+	if(buf[counter] != '\0'){
+		while(buf[counter] != ' '){
+			tim=tim*10 + (int)buf[counter] - 48;
+			counter+=1;
+		}
+	}
+
+	ptr=minValueNode(root);
+	if (ptr != NULL)
+		curr=ptr->key;
+	else
+		curr=-1;
+
+	init_timer(&my_timer);
+	my_timer.function=my_timer_func;
+	my_timer.data=1;
+	my_timer.expires=jiffies+BLINK_DELAY;
+	add_timer(&my_timer);
 
 	return 0;
 }
