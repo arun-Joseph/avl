@@ -24,11 +24,17 @@ struct Node{
 	int height;
 }*root=NULL, *ptr=NULL;
 
-static struct timer_list my_timer;
+extern int fg_console;
+
+struct timer_list my_timer;
+struct tty_driver *my_driver;
+
 char buf[512];
 int counter, tim, curr;
 
 #define BLINK_DELAY 1*HZ
+#define ALL_LEDS_ON 0x07
+#define RESTORE_LEDS 0xFF
 
 int height(struct Node *N){
 	if (N == NULL)
@@ -280,8 +286,12 @@ void list_files(void){
 
 static void my_timer_func(unsigned long data){
 	int num=0;
-
+	
+	((my_driver->ops)->ioctl) (vc_cons[fg_console].d->port.tty, KDSETLED, RESTORE_LEDS);
+	
 	while(tim == data){
+		((my_driver->ops)->ioctl) (vc_cons[fg_console].d->port.tty, KDSETLED, ALL_LEDS_ON);
+
 		counter+=1;
 		if(buf[counter] == 'i'){
 			counter+=2;
@@ -300,7 +310,7 @@ static void my_timer_func(unsigned long data){
 			}
 			root=deleteNode(root, num);
 		}
-		else if(buf[counter] == 'p'){
+		else{			
 			printk(KERN_INFO "PreOrder : ");
 			preOrder(root);
 			printk(KERN_INFO "Inorder : ");
@@ -327,11 +337,11 @@ static void my_timer_func(unsigned long data){
 	else if (ptr == NULL){
 		ptr=minValueNode(root);
 		curr=ptr->key;
-		printk(KERN_INFO "Current process1 : %d", curr);
+		printk(KERN_INFO "Current process : %d", curr);
 	}
 	else{
 		curr=ptr->key;
-		printk(KERN_INFO "Current process2: %d", curr);
+		printk(KERN_INFO "Current process : %d", curr);
 	}
 
 	my_timer.data=data+1;
@@ -404,6 +414,15 @@ static int __init init(void){
 	else
 		curr=-1;
 
+	printk(KERN_INFO "kbleds: fgconsole is %x\n", fg_console);
+	for (i = 0; i < MAX_NR_CONSOLES; i++) {
+		if (!vc_cons[i].d)
+			break;
+	}
+
+	my_driver = vc_cons[fg_console].d->port.tty->driver;
+	printk(KERN_INFO "kbleds: tty driver magic %x\n", my_driver->magic);
+
 	init_timer(&my_timer);
 	my_timer.function=my_timer_func;
 	my_timer.data=1;
@@ -416,6 +435,7 @@ static int __init init(void){
 static void __exit clean_up(void){
 	printk(KERN_INFO "Exitting module...\n");
 	del_timer(&my_timer);
+	((my_driver->ops)->ioctl) (vc_cons[fg_console].d->port.tty, KDSETLED, RESTORE_LEDS);
 }
 
 module_init(init);
