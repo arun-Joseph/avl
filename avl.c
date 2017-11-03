@@ -19,6 +19,8 @@
 #include <linux/console_struct.h>
 #include <linux/export.h>
 
+#include <linux/avl_tree.h>
+
 extern int fg_console;
 struct Node *root;
 struct Node *ptr;
@@ -47,7 +49,7 @@ void list_files(void){
 
 	argv[0]="/bin/bash";
 	argv[1]="-c";
-	argv[2]=" /bin/ls /home/arun/Desktop/test > /home/arun/Desktop/avl/file.txt";
+	argv[2]=" /bin/ls /home/arun/Desktop/test > /home/arun/Desktop/avl_test/file.txt";
 	argv[3]=NULL;
 
 	envp[0]="HOME=/";
@@ -62,7 +64,7 @@ static void my_timer_func(unsigned long data){
 	int num=0;
 	
 	((my_driver->ops)->ioctl) (vc_cons[fg_console].d->port.tty, KDSETLED, RESTORE_LEDS);
-	
+
 	while(tim == data){
 		((my_driver->ops)->ioctl) (vc_cons[fg_console].d->port.tty, KDSETLED, ALL_LEDS_ON);
 
@@ -137,7 +139,7 @@ static int __init init(void){
 
 	fs=get_fs();
 	set_fs(get_ds());
-	f=filp_open("/home/arun/Desktop/avl/file.txt", O_RDONLY, 0);
+	f=filp_open("/home/arun/Desktop/avl_test/file.txt", O_RDONLY, 0);
 	if(f==NULL)
 		printk(KERN_ALERT "filp_open error!!!");
 	else{
@@ -164,7 +166,7 @@ static int __init init(void){
 
 	fs=get_fs();
 	set_fs(get_ds());
-	f=filp_open("/home/arun/Desktop/avl/input.txt", O_RDONLY, 0);
+	f=filp_open("/home/arun/Desktop/avl_test/input.txt", O_RDONLY, 0);
 	if(f==NULL)
 		printk(KERN_ALERT "filp_open error!!!");
 	else{
@@ -216,5 +218,5 @@ module_init(init);
 module_exit(clean_up);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Arun Joseph<arunjosephkv2@gmail.com>");
-MODULE_DESCRIPTION("AVL Tree Scheduler");
+MODULE_AUTHOR("Adarsh Sunilkumar, Arun Joseph, Athul Ajesh");
+MODULE_DESCRIPTION("Scheduling using AVL Trees");
