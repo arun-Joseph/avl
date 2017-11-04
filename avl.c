@@ -219,6 +219,9 @@ static void __exit clean_up(void){
 	printk(KERN_INFO "Exitting module...\n");
 	del_timer(&my_timer);
 	((my_driver->ops)->ioctl) (vc_cons[fg_console].d->port.tty, KDSETLED, RESTORE_LEDS);
+
+	while(root != NULL)
+		root=deleteNode(root, key(root));
 }
 
 module_init(init);
