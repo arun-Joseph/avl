@@ -40,7 +40,7 @@ struct tty_driver *my_driver;
 char buf[512];
 int counter, tim, curr;
 
-#define BLINK_DELAY 1*HZ
+#define BLINK_DELAY 2*HZ
 #define ALL_LEDS_ON 0x07
 #define RESTORE_LEDS 0xFF
 
@@ -49,7 +49,7 @@ void list_files(void){
 
 	argv[0]="/bin/bash";
 	argv[1]="-c";
-	argv[2]=" /bin/ls /home/arun/Desktop/test > /home/arun/Desktop/avl_test/file.txt";
+	argv[2]=" /bin/ls /home/arun/Desktop/test > /home/arun/Desktop/avl/file.txt";
 	argv[3]=NULL;
 
 	envp[0]="HOME=/";
@@ -76,17 +76,21 @@ static void my_timer_func(unsigned long data){
 				num=num*10 + (int)buf[counter] - 48;
 				counter+=1;
 			}
+			printk("Inserting : %d", num);
 			root=insert(root, num);
 		}
 		else if(buf[counter] == 'r'){
 			counter+=2;
+			num=0;
 			while(buf[counter] != '\n' && buf[counter] != '\0'){
 				num=num*10 + (int)buf[counter] - 48;
 				counter+=1;
 			}
+			printk("Deleting : %d", num);
 			root=deleteNode(root, num);
 		}
-		else{			
+		else{
+			counter+=1;
 			printk(KERN_INFO "PreOrder : ");
 			preOrder(root);
 			printk(KERN_INFO "Inorder : ");
@@ -139,7 +143,7 @@ static int __init init(void){
 
 	fs=get_fs();
 	set_fs(get_ds());
-	f=filp_open("/home/arun/Desktop/avl_test/file.txt", O_RDONLY, 0);
+	f=filp_open("/home/arun/Desktop/avl/file.txt", O_RDONLY, 0);
 	if(f==NULL)
 		printk(KERN_ALERT "filp_open error!!!");
 	else{
@@ -164,9 +168,12 @@ static int __init init(void){
 	if(i!=0)
 		root=insert(root, num);
 
+	for(i=0;i<512;i++)
+		buf[i]=0;
+
 	fs=get_fs();
 	set_fs(get_ds());
-	f=filp_open("/home/arun/Desktop/avl_test/input.txt", O_RDONLY, 0);
+	f=filp_open("/home/arun/Desktop/avl/input.txt", O_RDONLY, 0);
 	if(f==NULL)
 		printk(KERN_ALERT "filp_open error!!!");
 	else{
